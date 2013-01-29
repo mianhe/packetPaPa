@@ -10,4 +10,10 @@ Robot Framework Library for network packet pack and parse(Packet PaPa) , as well
  
 - a couple of pre-defined prtotcol packet(e.g. dhcp, dns), more is coming
 - ready to be extent at robot user key words level to support any kind of packet at L2/L3/L3+
+ 
+ 
 
+To do List:
+- to support more kinds of packet 
+- to support only UDP but also TCP and STCP, and Ethernet Frames (Raw Scoket)
+- to support calcualtion field (e.g. 802.1x packet)
