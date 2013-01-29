@@ -1,0 +1,107 @@
+*** Settings ***
+Documentation     when add resouces, \ it must follow the sequence
+Resource          common_ressouce.txt
+Library           ../../src/converter.py
+Library           ../../src/network.py
+Library           ../../src/packetPaPa.py
+
+*** Test Cases ***
+parse DNS
+    parse packet from bit stream    dns packet definition    \\x 5d 53 81 80 00 01 00 00 00 01 00 00 04 71 69 6e 67 05 77 65 69 62 6f 03 63 6f 6d 00 00 1c 00 01 c0 11 00 06 00 01 00 00 00 3c 00 30 03 6e 73 31 04 73 69 6e 61 03 63 6f 6d 02 63 6e 00 06 7a 68 69 68 61 6f 05 73 74 61 66 66 c0 30 00 00 00 01 00 00 70 80 00 00 1c 20 00 09 3a 80
+    ${content}    Show Packet
+    log    ${content}
+
+Compse DNS
+    Start Packet
+    dns head
+    Set Value    ID    0x1234
+    add question    www.abc.com    1    1
+    add question    www.123.com    1    1
+    add aditional RRs    12    1    1    1    www.xyz.com
+    ${stream}    pack packet
+    log    the packet is build and stream is composed, let's parse the stream back to check
+    Setup Network    127.0.01    ${12349}    ${53}
+    Send Buffer    ${stream}
+
+compose dns with query, and parse back
+    Start packet
+    dns head
+    add question    www.abc.com    1    1
+    add question    www.123.com    1    1
+    add aditional RRs    12    1    1    1    www.xyz.com
+    ${stream}    pack packet
+    log    the packet is build and stream is composed, let's parse the stream back to check
+    parse packet from bit stream    dns packet definition    ${stream}
+    ${url}    get value    Questions[1].query name
+    Should Be Equal    ${url}    www.abc.com
+    ${url}    get value    Questions[2].query name
+    Should Be Equal    ${url}    www.123.com
+    ${url}    get value    Additional RRs[1].Rdata
+    Should Be Equal    ${url}    www.xyz.com
+
+*** Keywords ***
+dns packet definition
+    start packet
+    dns head
+    head end
+    array    Questions    QDCOUNT    query structure
+    array    Answer RRs    ANCOUNT    resource structure
+    array    Authority RRs    NSCOUNT    resource structure
+    array    Additional RRs    ARCOUNT    resource structure
+
+dns head
+    u16    ID
+    bits    QR    1
+    bits    Opcode    4    15
+    bits    AA    1
+    bits    TC    1
+    bits    RD    1
+    bits    RA    1
+    bits    Z    3
+    bits    RCODE    4    15
+    u16    QDCOUNT    0
+    u16    ANCOUNT    0
+    u16    NSCOUNT    0
+    u16    ARCOUNT    0
+
+query structure
+    [Arguments]    ${prefix}=''    ${queryname}=''    ${type}=0    ${class}=0
+    Dot Split    ${prefix}.query name    ${queryname}
+    u16    ${prefix}.type    ${type}
+    u16    ${prefix}.class    ${class}
+
+resource structure
+    [Arguments]    ${prefix}    ${name}=0    ${type}=0    ${class}=0    ${TTL}=0    ${Rdata}=''
+    u16    ${prefix}.name    ${name}
+    u16    ${prefix}.type    ${type}
+    u16    ${prefix}.class    ${class}
+    u32    ${prefix}.TTL    ${TTL}
+    length value    ${prefix}.Rdata    2    ${Rdata}
+
+add question
+    [Arguments]    ${query Name}    ${type}=0    ${class}=0
+    ${count}    Get Value    QDCOUNT
+    ${count} =    Evaluate    ${count}+1
+    Set Value    QDCOUNT    ${count}
+    query structure    questions[${count}]    ${query Name}    ${type}    ${class}
+
+add answer RRs
+    [Arguments]    ${name}    ${type}    ${class}    ${TTL}    ${ Rdata}
+    ${count}    Get Value    ANCOUNT
+    ${count} =    Evaluate    ${count}+1
+    Set Value    ANCOUNT    ${count}
+    resource structure    Answer RRs[${count}]    ${name}    ${type}    ${class}    ${TTL}    ${ Rdata}
+
+add aditional RRs
+    [Arguments]    ${name}    ${type}    ${class}    ${TTL}    ${ Rdata}
+    ${count}    Get Value    ARCOUNT
+    ${count} =    Evaluate    ${count}+1
+    Set Value    ARCOUNT    ${count}
+    resource structure    Additional RRs[${count}]    ${name}    ${type}    ${class}    ${TTL}    ${ Rdata}
+
+add authority RRs
+    [Arguments]    ${name}    ${type}    ${class}    ${TTL}    ${ Rdata}
+    ${count}    Get Value    NSCOUNT
+    ${count} =    Evaluate    ${count}+1
+    Set value    NSCOUNT    ${count}
+    resource structure    Authority RRs[${count}]    ${name}    ${type}    ${class}    ${TTL}    ${ Rdata}

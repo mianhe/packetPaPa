@@ -1,0 +1,39 @@
+*** Settings ***
+
+*** Variables ***
+${build, parse start, restart }    ${EMPTY}
+${stream to be parsed}    ${EMPTY}
+
+*** Keywords ***
+packet end
+    Run Keyword If    '${parse or build}' == 'Start Parse'    parse packet    ${stream to be parsed}
+    Run Keyword If    '${parse or build}' == 'Start Parse'    Set Variable    ${parse or build}    Restart Parse
+    Run Keyword If    '${parse or build}' == 'Restart Parse'    resume parse
+
+head end
+    parse packet    ${stream to be parsed}
+
+parse packet from bit stream
+    [Arguments]    ${template}    ${bit stream}
+    ${stream to be parsed}=    Set Variable    ${bit stream}
+    Run Keyword    ${template}
+
+array
+    [Arguments]    ${name}    ${length field}    ${define}
+    ${length}=    get value    ${length field}
+    : FOR    ${index}    IN RANGE    ${1}    ${length} +1
+    \    run keyword    ${define}    ${name}[${index}]
+    parse packet
+
+tlv group
+    [Arguments]    ${prefix}    @{param list}
+    : FOR    ${index}    IN RANGE    ${1}    ${255}
+    \    tlv    ${prefix}[${index}]    @{param list}
+    \    parse packet
+    \    ${tlv type}    ${tlv value}=    Get Value    ${prefix}[${index}]
+    \    Run Keyword If    ${tlv type}==${255}    Exit For Loop
+
+prepared for build
+    [Arguments]    ${template}
+    ${parse or build}=    Set Variable    build
+    Run Keyword    ${template}
